@@ -31,10 +31,11 @@ SELECT id                    AS projectID,
        status                AS projectStatus,
        getFacultyDetails(id) AS faculty,
        getStudentDetails(id) AS student
-FROM paper
-WHERE id IN (SELECT paper_id
-             FROM student_writes_paper
-             WHERE srn = '${req.body.id}')
+FROM paper AS t1
+WHERE EXISTS (SELECT *
+              FROM student_writes_paper AS t2
+              WHERE srn = 'PES2UG21CS001'
+                AND t1.id = t2.paper_id)
 ORDER BY projectID;
 
 SELECT id                    AS projectID,
@@ -42,10 +43,11 @@ SELECT id                    AS projectID,
        status                AS projectStatus,
        getFacultyDetails(id) AS faculty,
        getStudentDetails(id) AS student
-FROM paper
-WHERE id IN (SELECT paper_id
-             FROM faculty_advises_paper
-             WHERE faculty_id = '${req.body.id}')
+FROM paper AS t1
+WHERE EXISTS (SELECT *
+             FROM faculty_advises_paper AS t2
+             WHERE faculty_id = '${req.body.id}'
+               AND t1.id = t2.paper_id)
 ORDER BY projectID;
 
 SELECT id                    AS projectID,
