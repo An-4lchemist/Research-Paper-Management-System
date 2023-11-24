@@ -103,7 +103,6 @@ async function handleLogin(req, res) {
                  FROM faculty
                  WHERE id = '${req.body.id}'`;
         }
-
         [result, _] = await connection.query(sqlQuery);
 
         if (result.length !== 0 && result[0].password === req.body.pwd) {
@@ -192,8 +191,8 @@ async function handleRegister(req, res) {
                          '${req.body.details.domain}',
                          '${req.body.pwd}')`;
         }
-
         await connection.query(sqlQuery);
+
         let response = {status: true};
 
         await connection.end();
@@ -246,11 +245,12 @@ async function handleGetProjects(req, res) {
                                    status                AS projectStatus,
                                    getFacultyDetails(id) AS faculty,
                                    getStudentDetails(id) AS student
-                            FROM paper
-                            WHERE id IN (SELECT paper_id
-                                         FROM student_writes_paper
-                                         WHERE srn = '${req.body.id}')
-                            ORDER BY projectID`;
+                            FROM paper AS t1
+                            WHERE EXISTS (SELECT *
+                                          FROM student_writes_paper AS t2
+                                          WHERE srn = '${req.body.id}'
+                                            AND t1.id = t2.paper_id)
+                            ORDER BY projectID;`;
                 break;
             case "faculty":
                 sqlQuery = `SELECT id                    AS projectID,
@@ -258,11 +258,12 @@ async function handleGetProjects(req, res) {
                                    status                AS projectStatus,
                                    getFacultyDetails(id) AS faculty,
                                    getStudentDetails(id) AS student
-                            FROM paper
-                            WHERE id IN (SELECT paper_id
-                                         FROM faculty_advises_paper
-                                         WHERE faculty_id = '${req.body.id}')
-                            ORDER BY projectID`;
+                            FROM paper AS t1
+                            WHERE EXISTS (SELECT *
+                                         FROM faculty_advises_paper AS t2
+                                         WHERE faculty_id = '${req.body.id}'
+                                           AND t1.id = t2.paper_id)
+                            ORDER BY projectID;`;
                 break;
             case "guest":
                 sqlQuery = `SELECT id                    AS projectID,
@@ -793,12 +794,13 @@ async function handleGetSuggestions(req, res) {
         let sqlQuery, suggestionsList, _, connection = await getConnection();
         sqlQuery =
             `SELECT t1.*, Concat(first_name, ' ', last_name) AS name
-             FROM (SELECT faculty_id AS id, suggestions AS msg, DATE_FORMAT(timestamp, '%Y-%m-%d %H-%i-%s') AS time
+             FROM (SELECT faculty_id                                  AS id,
+                          suggestions                                 AS msg,
+                          DATE_FORMAT(timestamp, '%Y-%m-%d %H-%i-%s') AS time
                    FROM faculty_advises_paper
                    WHERE paper_id = ${req.body.projectID}
                      AND suggestions <> '') AS t1
                       NATURAL JOIN faculty`;
-
         [suggestionsList, _] = await connection.query(sqlQuery);
 
         let response = {status: true, suggestions: suggestionsList};
@@ -837,14 +839,15 @@ async function handleGetLitSurveys(req, res) {
             `SELECT doi, keywords, DATE_FORMAT(date, '%Y-%m-%d') AS date, authors, datasets
              FROM literature_survey
                       NATURAL JOIN
-                  (select doi, Concat('[', Group_Concat(Concat('"', first_name, ' ', last_name, '"')), ']') AS authors
+                  (select doi,
+                          Concat('[', Group_Concat(Concat('"', first_name, ' ', last_name, '"')), ']') AS authors
                    from literature_survey_authors
                    group by doi) AS t1
                       NATURAL JOIN
-                  (select doi, Concat('[', Group_Concat(Concat('"', dataset, '"')), ']') AS datasets
+                  (select doi,
+                          Concat('[', Group_Concat(Concat('"', dataset, '"')), ']') AS datasets
                    from literature_survey_datasets
                    group by doi) AS t2`;
-
         [surveyList, _] = await connection.query(sqlQuery);
 
         surveyList.forEach((item) => {
